@@ -1,0 +1,91 @@
+blueprint:
+  name: Krótkie Naciśnięcie Przełącznika - Automatyzacja
+  description: Automatyzacja do obsługi krótkiego naciśnięcia przełącznika, które włącza/wyłącza określoną encję.
+  domain: automation
+  input:
+    switch_entity:
+      name: Przełącznik
+      description: Przełącznik, który będzie używany do wykrywania krótkiego naciśnięcia.
+      selector:
+        entity:
+          domain: switch
+    max_duration:
+      name: Maksymalny Czas (sekundy)
+      description: Maksymalny czas, w którym przełącznik musi zostać wyłączony, aby uznać to za krótkie naciśnięcie.
+      default: 1
+      selector:
+        number:
+          min: 0.1
+          max: 10
+          step: 0.1
+          unit_of_measurement: seconds
+    target_entity:
+      name: Encja do Przełączenia
+      description: Encja, która zostanie przełączona po krótkim naciśnięciu przełącznika.
+      selector:
+        entity:
+          domain:
+            - light
+            - switch
+            - fan
+            - media_player
+            - climate
+            - cover
+
+alias: !input switch_entity
+description: Automatyzacja do obsługi krótkiego naciśnięcia przełącznika
+trigger:
+  - platform: state
+    entity_id: !input switch_entity
+    from: "on"
+    to: "off"
+condition:
+  - condition: template
+    value_template: >-
+      {% set duration = (now() - trigger.from_state.last_changed).total_seconds() %}
+      {{ duration < (input_number | float) }}
+    variables:
+      input_number: !input max_duration
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ states[target_entity].domain == 'cover' }}
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ is_state(target_entity, 'open') }}
+            then:
+              - service: cover.close_cover
+                target:
+                  entity_id: !input target_entity
+            else:
+              - service: cover.open_cover
+                target:
+                  entity_id: !input target_entity
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ states[target_entity].domain == 'media_player' }}
+        sequence:
+          - if:
+              - condition: template
+                value_template: >-
+                  {{ is_state(target_entity, 'off') }}
+            then:
+              - service: media_player.turn_on
+                target:
+                  entity_id: !input target_entity
+            else:
+              - service: media_player.turn_off
+                target:
+                  entity_id: !input target_entity
+    default:
+      - service: homeassistant.toggle
+        target:
+          entity_id: !input target_entity
+    variables:
+      target_entity: !input target_entity
+mode: single
