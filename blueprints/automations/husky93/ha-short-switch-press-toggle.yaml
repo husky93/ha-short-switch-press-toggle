@@ -39,16 +39,15 @@ trigger:
     entity_id: !input switch_entity
     from: "on"
     to: "off"
+variables:
+  input_number: !input max_duration
+  target_entity: !input target_entity
 condition:
   - condition: template
     value_template: >-
       {% set duration = (now() - trigger.from_state.last_changed).total_seconds() %}
       {{ duration < (input_number | float) }}
-    variables:
-      input_number: !input max_duration
 action:
-  - variables:
-      target_entity: !input target_entity
   - choose:
       - conditions:
           - condition: template
